@@ -314,6 +314,7 @@ class PriceAnalyzerApp(QMainWindow):
         
         self.update_stats()
 
+
     def delete_selected(self):
         """
         Removes the currently selected product from both the UI list and internal storage.
@@ -369,23 +370,19 @@ class PriceAnalyzerApp(QMainWindow):
         self.median_label.setText(f"{median_price:.2f}")
 
 
-    def save_to_excel(self):
-        """
-        Exports stored items and statistical metrics to an Excel (.xlsx) file.
+    #=========================================================================
+    # EXPORT & FORMATTING LOGIC (Separated by responsibilities)
+    # =========================================================================
 
-        Opens a native file save dialog starting in the current working directory.
-        Generates a structured .xlsx spreadsheet containing product names, prices,
-        and summary metrics (Minimum, Maximum, Median).
-        """
+    def save_to_excel(self):
+        """Handles GUI file dialog and file write operations."""
         if not self.items:
             QMessageBox.warning(self, "Warning", "There are no items to save.")
             return
 
-        # 1. Start dialog in the program's working directory
         initial_dir = os.getcwd()
         default_filepath = os.path.join(initial_dir, "prices_report.xlsx")
 
-        # 2. Open native GUI file picker
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Save Price Report",
@@ -393,37 +390,14 @@ class PriceAnalyzerApp(QMainWindow):
             "Excel Files (*.xlsx)"
         )
 
-        # If the user canceled the dialog window
         if not file_path:
             return
 
-        # Explicitly enforce .xlsx extension
         if not file_path.endswith('.xlsx'):
             file_path += '.xlsx'
 
-        # 3. Excel generation sequence
         try:
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "Prices Analysis"
-
-            # Table Header
-            ws.append(["Product", "Price"])
-
-            # Product Rows
-            prices = []
-            for name, price in self.items:
-                ws.append([name, price])
-                prices.append(price)
-
-            # Visual Separator
-            ws.append([])
-
-            # Summary Statistics
-            ws.append(["Minimum Price", min(prices)])
-            ws.append(["Maximum Price", max(prices)])
-            ws.append(["Median Price", statistics.median(prices)])
-
+            wb = self.generate_excel_workbook()
             wb.save(file_path)
             QMessageBox.information(
                 self, 
@@ -437,6 +411,77 @@ class PriceAnalyzerApp(QMainWindow):
                 "Error", 
                 f"Failed to save file:\n{str(err)}"
             )
+
+
+    def generate_excel_workbook(self) -> openpyxl.Workbook:
+        """Constructs and returns an in-memory Workbook populated with data."""
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Prices Analysis"
+
+        # 1. Header
+        ws.append(["Product", "Price"])
+
+        # 2. Rows
+        prices = []
+        for name, price in self.items:
+            ws.append([name, price])
+            prices.append(price)
+
+        # 3. Visual Separator
+        ws.append([])
+
+        # 4. Summary Statistics
+        summary_rows = [
+            ("Minimum Price", min(prices)),
+            ("Maximum Price", max(prices)),
+            ("Median Price", statistics.median(prices))
+        ]
+        for label, val in summary_rows:
+            ws.append([label, val])
+
+        # Apply formatting layers
+        self._apply_excel_styles(ws)
+
+        return wb
+
+
+    def _apply_excel_styles(self, ws):
+        """Applies colors, fonts, borders, and dimensions to the worksheet."""
+        header_fill = PatternFill(start_color="FFFF99", end_color="FFFF99", fill_type="solid")  # Yellow
+        summary_fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid") # Gray
+        bold_font = Font(bold=True)
+        thin_border = Border(
+            left=Side(style='thin', color='000000'),
+            right=Side(style='thin', color='000000'),
+            top=Side(style='thin', color='000000'),
+            bottom=Side(style='thin', color='000000')
+        )
+
+        # Format Header (Row 1)
+        for col in ['A1', 'B1']:
+            ws[col].fill = header_fill
+            ws[col].font = bold_font
+            ws[col].border = thin_border
+
+        # Format Summary Rows (Last 3 rows)
+        max_row = ws.max_row
+        summary_start_row = max_row - 2
+        for r in range(summary_start_row, max_row + 1):
+            for col_letter in ['A', 'B']:
+                cell = ws[f"{col_letter}{r}"]
+                cell.fill = summary_fill
+                cell.font = bold_font
+                cell.border = thin_border
+
+        # Auto-adjust column widths
+        max_product_length = max(
+            [len(name) for name, _ in self.items] + 
+            [len("Product"), len("Minimum Price")]
+        )
+        ws.column_dimensions['A'].width = max_product_length + 3
+        ws.column_dimensions['B'].width = 15
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
