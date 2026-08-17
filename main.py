@@ -1,5 +1,7 @@
 import sys
 import statistics
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QListWidget, QFormLayout, 
@@ -43,8 +45,8 @@ class PriceAnalyzerApp(QMainWindow):
 
         # List for tuples: (name, price)
         self.items = []
-
         self.init_ui()
+        self.setup_navigation()
 
 
     def init_ui(self):
@@ -113,6 +115,33 @@ class PriceAnalyzerApp(QMainWindow):
         main_layout.addWidget(stats_group)
 
 
+    def setup_navigation(self):
+        """Keyboard navigation logic config."""
+        
+        # 1. Focus order when pressing "Tab"
+        self.setTabOrder(self.name_input, self.price_input)
+        self.setTabOrder(self.price_input, self.add_btn)
+        self.setTabOrder(self.add_btn, self.list_widget)
+        self.setTabOrder(self.list_widget, self.delete_btn)
+        self.setTabOrder(self.delete_btn, self.clear_btn)    
+        self.setTabOrder(self.clear_btn, self.name_input)
+
+        # 2. "Enter" button logic
+        # When the name input field has focus, the focus shifts to the price input field.
+        # If the price input field has focus, the product is added to the list.
+        # If one of the interactive buttons has focus, its function is executed.
+        self.name_input.returnPressed.connect(self.price_input.setFocus)
+        self.price_input.returnPressed.connect(self.add_item)
+
+        # 3. Deletion via the "Delete" key (works only when the list has focus)
+        delete_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Delete), self.list_widget)
+        delete_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+        delete_shortcut.activated.connect(self.delete_selected)
+
+        # Set focus on the first field
+        self.name_input.setFocus()
+
+
     def add_item(self):
         """
         Validates user input and appends a new product entry to the collection.
@@ -151,6 +180,7 @@ class PriceAnalyzerApp(QMainWindow):
         # Reset fields
         self.name_input.clear()
         self.price_input.clear()
+        self.name_input.setFocus()
         
         self.update_stats()
 
