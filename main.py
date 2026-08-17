@@ -2,7 +2,7 @@ import sys
 import os
 import statistics
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 import openpyxl
+from openpyxl.styles import Font, PatternFill, Border, Side
 
 class PriceAnalyzerApp(QMainWindow):
     """
@@ -152,8 +153,123 @@ class PriceAnalyzerApp(QMainWindow):
         self.save_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
         self.save_shortcut.activated.connect(self.save_to_excel)
 
-        # Set focus on the first field
-        self.name_input.setFocus()
+        # 5. Register Event Filter for arrow key navigation
+        nav_widgets = [
+            self.name_input, self.price_input, self.add_btn,
+            self.list_widget, self.save_btn, self.delete_btn, self.clear_btn
+        ]
+        for w in nav_widgets:
+            w.installEventFilter(self)
+
+        # Set focus on the first field with TabFocusReason for visual outline
+        self.set_focus(self.name_input)
+
+    
+    def set_focus(self, widget=None):
+        """Sets input focus to a target widget while maintaining keyboard focus styling.
+
+        Applies `Qt.FocusReason.TabFocusReason` when transferring focus. This ensures 
+        that the operating system's widget style correctly renders visual focus 
+        indicators (such as outlines or focus rings) for keyboard-driven navigation.
+
+        Args:
+            widget (QWidget, optional): The target Qt widget to receive focus. 
+                If set to None, defaults to `self.price_input`. Defaults to None.
+
+        Returns:
+            None
+        """
+        if widget is None:
+            widget = self.price_input
+        widget.setFocus(Qt.FocusReason.TabFocusReason)
+
+
+    def eventFilter(self, watched, event):
+        """Intercepts keyboard events to handle directional arrow-key navigation.
+
+        Monitors `KeyPress` events dispatched to registered UI elements. Overrides
+        default widget arrow-key behavior to allow seamless bidirectional focus
+        traversal between input fields, buttons, and the product list.
+
+        Args:
+            watched (QObject): The Qt object or widget currently receiving the event.
+            event (QEvent): The event being processed.
+
+        Returns:
+            bool: True if the key press event was handled and should be consumed;
+            False if it should be passed down to the base class event filter."""
+        if event.type() == QEvent.Type.KeyPress:
+            key = event.key()
+
+            # From Name Input
+            if watched == self.name_input:
+                if key == Qt.Key.Key_Down:
+                    self.set_focus(self.price_input)
+                    return True
+
+            # From Price Input
+            elif watched == self.price_input:
+                if key == Qt.Key.Key_Up:
+                    self.set_focus(self.name_input)
+                    return True
+                elif key == Qt.Key.Key_Down:
+                    self.set_focus(self.add_btn)
+                    return True
+
+            # From Add Product Button
+            elif watched == self.add_btn:
+                if key in (Qt.Key.Key_Up, Qt.Key.Key_Left):
+                    self.set_focus(self.price_input)
+                    return True
+                elif key in (Qt.Key.Key_Down, Qt.Key.Key_Right):
+                    self.set_focus(self.list_widget)
+                    if self.list_widget.count() > 0 and self.list_widget.currentRow() < 0:
+                        self.list_widget.setCurrentRow(0)
+                    return True
+
+            # From Product List Widget
+            elif watched == self.list_widget:
+                curr = self.list_widget.currentRow()
+                count = self.list_widget.count()
+                if key == Qt.Key.Key_Up:
+                    if count == 0 or curr <= 0:
+                        self.set_focus(self.add_btn)
+                        return True
+                elif key == Qt.Key.Key_Down:
+                    if count == 0 or curr >= count - 1:
+                        self.set_focus(self.save_btn)
+                        return True
+
+            # From Save Button
+            elif watched == self.save_btn:
+                if key in (Qt.Key.Key_Up, Qt.Key.Key_Left):
+                    self.set_focus(self.list_widget)
+                    if self.list_widget.count() > 0:
+                        self.list_widget.setCurrentRow(self.list_widget.count() - 1)
+                    return True
+                elif key in (Qt.Key.Key_Down, Qt.Key.Key_Right):
+                    self.set_focus(self.delete_btn)
+                    return True
+
+            # From Delete Selected Button
+            elif watched == self.delete_btn:
+                if key in (Qt.Key.Key_Up, Qt.Key.Key_Left):
+                    self.set_focus(self.save_btn)
+                    return True
+                elif key in (Qt.Key.Key_Down, Qt.Key.Key_Right):
+                    self.set_focus(self.clear_btn)
+                    return True
+
+            # From Clear All Button
+            elif watched == self.clear_btn:
+                if key in (Qt.Key.Key_Up, Qt.Key.Key_Left):
+                    self.set_focus(self.delete_btn)
+                    return True
+                elif key in (Qt.Key.Key_Down, Qt.Key.Key_Right):
+                    self.set_focus(self.name_input)
+                    return True
+
+        return super().eventFilter(watched, event)
 
 
     def add_item(self):
