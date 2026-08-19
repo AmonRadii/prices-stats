@@ -153,7 +153,12 @@ class PriceAnalyzerApp(QMainWindow):
         self.save_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
         self.save_shortcut.activated.connect(self.save_to_excel)
 
-        # 5. Register Event Filter for arrow key navigation
+        # 5. Global Exit shortcut (Esc)
+        self.esc_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        self.esc_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        self.esc_shortcut.activated.connect(self.close)
+
+        # 6. Register Event Filter for arrow key navigation
         nav_widgets = [
             self.name_input, self.price_input, self.add_btn,
             self.list_widget, self.save_btn, self.delete_btn, self.clear_btn
@@ -270,6 +275,45 @@ class PriceAnalyzerApp(QMainWindow):
                     return True
 
         return super().eventFilter(watched, event)
+
+
+    def closeEvent(self, event):
+        """Handles the window close event and prompts the user for confirmation.
+
+        Displays a custom confirmation dialog when the user attempts to close 
+        the window (e.g., via the Escape key or window controls). Prompts whether 
+        to save data, discard changes, or cancel the exit action.
+
+        Args:
+            event (QCloseEvent): The Qt close event object.
+
+        Returns:
+            None
+        """
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Exit")
+        msg_box.setText("Do you want to save changes before exiting?")
+
+        save_btn = msg_box.addButton("Save", QMessageBox.ButtonRole.AcceptRole)
+        discard_btn = msg_box.addButton("Exit without saving", QMessageBox.ButtonRole.DestructiveRole)
+        cancel_btn = msg_box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+
+
+        
+        msg_box.setDefaultButton(save_btn)
+        msg_box.exec()
+
+        clicked_button = msg_box.clickedButton()
+
+        if clicked_button == save_btn:
+            if self.save_to_excel():
+                event.accept()
+            else:
+                event.ignore()
+        elif clicked_button == discard_btn:
+            event.accept()
+        else:
+            event.ignore()
 
 
     def add_item(self):
