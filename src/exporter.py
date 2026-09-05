@@ -2,7 +2,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Border, Side
 
 class ExcelExporter:
-    """Отвечает исключительно за формирование и стилизацию XLSX файлов."""
+    """Responsible for generating and styling Excel (.xlsx) files."""
     
     @staticmethod
     def export(filepath: str, items: list, stats: dict) -> bool:
@@ -11,13 +11,13 @@ class ExcelExporter:
             ws = wb.active
             ws.title = "Prices Analysis"
 
-            # 1. Формирование данных
+            # 1. Data formatting
             ws.append(["Product", "Price"])
             
             for name, price in items:
                 ws.append([name, price])
 
-            ws.append([]) # Пустая строка-разделитель
+            ws.append([]) # Empty separator row
 
             summary_rows = [
                 ("Minimum Price", stats.get("min")),
@@ -28,7 +28,7 @@ class ExcelExporter:
                 if val is not None:
                     ws.append([label, val])
 
-            # 2. Стилизация
+            # 2. Styling
             ExcelExporter._apply_styles(ws, items)
 
             wb.save(filepath)
@@ -48,13 +48,13 @@ class ExcelExporter:
             top=Side(style='thin', color='000000'), bottom=Side(style='thin', color='000000')
         )
 
-        # Стили шапки
+        # Header styles
         for col in ['A1', 'B1']:
             ws[col].fill = header_fill
             ws[col].font = bold_font
             ws[col].border = thin_border
 
-        # Стили итогов (последние 3 строки)
+        # Summaries styles (last 3 rows)
         max_row = ws.max_row
         for r in range(max_row - 2, max_row + 1):
             for col_letter in ['A', 'B']:
@@ -63,7 +63,7 @@ class ExcelExporter:
                 cell.font = bold_font
                 cell.border = thin_border
 
-        # Ширина колонок
-        max_product_length = max([len(name) for name, _ in items] + [15]) # 15 как минимум для заголовков
+        # Column width
+        max_product_length = max([len(name) for name, _ in items] + [15]) # 15 as a minimum for header
         ws.column_dimensions['A'].width = max_product_length + 3
         ws.column_dimensions['B'].width = 15
